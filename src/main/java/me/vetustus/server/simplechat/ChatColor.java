@@ -31,4 +31,8 @@ public final class ChatColor {
         }
         return new String(chars);
     }
+
+    public static String stripColor(String text) {
+        return text.replaceAll("(?<=§)\\p{Alnum}", "");
+    }
 }

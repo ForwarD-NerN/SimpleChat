@@ -4,12 +4,14 @@ import com.google.gson.Gson;
 import eu.pb4.placeholders.api.PlaceholderContext;
 import eu.pb4.placeholders.api.Placeholders;
 import eu.pb4.placeholders.api.TextParserUtils;
-import me.vetustus.server.simplechat.api.event.PlayerChatCallback;
 import me.vetustus.server.simplechat.integration.FTBTeamsIntegration;
 import me.vetustus.server.simplechat.integration.LuckPermsIntegration;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.network.message.MessageBody;
+import net.minecraft.network.message.SignedMessage;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
@@ -22,6 +24,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 
@@ -44,20 +47,12 @@ public class SimpleChat implements ModInitializer {
         boolean ftbteams = FabricLoader.getInstance().isModLoaded("ftbteams");
         boolean luckperms = FabricLoader.getInstance().isModLoaded("luckperms");
 
-        PlayerChatCallback.EVENT.register((player, message) -> {
-            PlayerChatCallback.ChatMessage chatMessage = new PlayerChatCallback.ChatMessage(player, message);
+        ServerMessageEvents.ALLOW_CHAT_MESSAGE.register(((signedMessage, player, params) -> {
+            String message = signedMessage.getContent().getString();
+            if (!config.isChatModEnabled()) return true;
 
-            /*
-             * If someone wants to use the mod as a library,
-             * they must disable the "enable_chat_mod" parameter,
-             * then the chat will not be handled by the mod.
-             */
-            if (!config.isChatModEnabled())
-                return chatMessage;
-
-            chatMessage.setCancelled(true);
-
-            // TODO: Add mention/private message
+            SignedMessage fakeMessage = new SignedMessage(signedMessage.link(), signedMessage.signature(),
+                    new MessageBody(message.replace("!", "").replace("#", ""), Instant.MIN, 0, null), signedMessage.unsignedContent(), signedMessage.filterMask());
 
             boolean isGlobalMessage = false;
             boolean isWorldMessage = false;
@@ -67,6 +62,7 @@ public class SimpleChat implements ModInitializer {
                     isGlobalMessage = true;
                     chatFormat = config.getGlobalChatFormat();
                     message = message.substring(1);
+                    ServerMessageEvents.CHAT_MESSAGE.invoker().onChatMessage(fakeMessage, player, params);
                 }
             }
             if (config.isWorldChatEnabled()) {
@@ -74,6 +70,7 @@ public class SimpleChat implements ModInitializer {
                     isWorldMessage = true;
                     chatFormat = config.getWorldChatFormat();
                     message = message.substring(1);
+                    ServerMessageEvents.CHAT_MESSAGE.invoker().onChatMessage(fakeMessage, player, params);
                 }
             }
             String prepareStringMessage = chatFormat
@@ -90,7 +87,6 @@ public class SimpleChat implements ModInitializer {
             if (config.isChatColorsEnabled())
                 stringMessage = translateChatColors('&', stringMessage);
 
-//            Text resultMessage = literal(stringMessage);
             Text resultMessage = Placeholders.parseText(TextParserUtils.formatText(stringMessage), PlaceholderContext.of(player));
 
             int isPlayerLocalFound = 0;
@@ -103,7 +99,6 @@ public class SimpleChat implements ModInitializer {
                     if (isGlobalMessage) {
                         p.sendMessage(resultMessage, false);
                     } else if (isWorldMessage && config.isWorldChatEnabled()) {
-//                        p.world.getDimensionKey().getValue();
                         if (p.getEntityWorld().getRegistryKey().getValue() == player.getEntityWorld().getRegistryKey().getValue()) {
                             p.sendMessage(resultMessage, false);
                         }
@@ -127,33 +122,17 @@ public class SimpleChat implements ModInitializer {
                 } else {
                     p.sendMessage(resultMessage, false);
                 }
-
-                //
-//                if (config.isGlobalChatEnabled()) {
-//                    if (isGlobalMessage) {
-//                        p.sendMessage(resultMessage, false);
-//                    } else {
-//                        if (p.squaredDistanceTo(player) <= config.getChatRange()) {
-//                            p.sendMessage(resultMessage, false);
-//                        }
-//                    }
-//                } else {
-//                    p.sendMessage(resultMessage, false);
-//                }
             }
 
-            if (
-                    config.noPlayerNearbyMessage() &&
-                    isPlayerLocalFound <= 1 && !isGlobalMessage && !isWorldMessage
-            ) {
+            if (config.noPlayerNearbyMessage() && isPlayerLocalFound <= 1 && !isGlobalMessage && !isWorldMessage) {
                 String noPlayerNearbyText = config.getNoPlayerNearbyText();
                 Text noPlayerNearbyTextResult = literal(translateChatColors('&', noPlayerNearbyText));
                 player.sendMessage(noPlayerNearbyTextResult, config.noPlayerNearbyActionBar());
             }
 
-            LOGGER.info(stringMessage);
-            return chatMessage;
-        });
+            LOGGER.info(ChatColor.stripColor(resultMessage.getString()).replace("§", ""));
+            return false;
+        }));
 
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
                 dispatcher.register(CommandManager.literal("simplechat").executes(context -> {
