@@ -1,11 +1,15 @@
-# SimpleChat (fork)
+# SimpleChat (fork of fork)
 
 ![Modrinth downloads badge](https://img.shields.io/modrinth/dt/O2DN3m2D)
 ![Modrinth versions badge](https://img.shields.io/modrinth/game-versions/O2DN3m2D)
 ![issues badge](https://img.shields.io/github/issues/stanlystark/SimpleChat)
 ![java 17 badge](https://img.shields.io/badge/java-17+-orange?logo=java)
 
-### This fork was created because the main project is [no longer maintained](https://github.com/cayennemc/SimpleChat/issues/11). Also added integration with FTB Teams.
+
+
+### This a fork of [the fork](https://github.com/stanlystark/SimpleChat) of [this mod](https://github.com/cayennemc/SimpleChat)
+It was made to fix this [issue](https://github.com/cayennemc/SimpleChat/issues/10) because the owner of the original fork [couldn't do that](https://github.com/stanlystark/SimpleChat/issues/4#issuecomment-1721069694). Also, it fixes a bug with console logs and Placeholder API prefixes.
+I can't guarantee compatibility with any other Discord integration mods aside from [BlockBot](https://github.com/DrexHD/BlockBot/tree/master), but you can try it out!
 
 _A simple chat mod for your server._
 
